@@ -57,6 +57,11 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        timer: {
+          ring: "hsl(var(--timer-ring))",
+          "ring-rest": "hsl(var(--timer-ring-rest))",
+          track: "hsl(var(--timer-track))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
