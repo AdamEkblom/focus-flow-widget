@@ -80,6 +80,19 @@ export function usePomodoro() {
     setIsRunning(false);
   }, []);
 
+  const setCustomTime = useCallback((workMinutes: number) => {
+    const breakMinutes = Math.max(1, Math.round(workMinutes / 5));
+    const p: PomodoroPreset = {
+      label: `${workMinutes} / ${breakMinutes}`,
+      work: workMinutes,
+      break: breakMinutes,
+    };
+    setPreset(p);
+    setMode("work");
+    setSecondsLeft(workMinutes * 60);
+    setIsRunning(false);
+  }, []);
+
   const toggle = useCallback(() => {
     if (!isRunning) requestNotificationPermission();
     setIsRunning((r) => !r);
@@ -100,6 +113,7 @@ export function usePomodoro() {
     preset,
     presets: PRESETS,
     selectPreset,
+    setCustomTime,
     mode,
     secondsLeft,
     totalSeconds,

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { usePomodoro } from "@/hooks/usePomodoro";
 import CircularProgress from "@/components/CircularProgress";
 import { Play, Pause, RotateCcw, SkipForward } from "lucide-react";
@@ -14,6 +15,7 @@ const PomodoroTimer = () => {
     preset,
     presets,
     selectPreset,
+    setCustomTime,
     mode,
     secondsLeft,
     progress,
@@ -23,6 +25,8 @@ const PomodoroTimer = () => {
     skip,
     completedSessions,
   } = usePomodoro();
+
+  const [customInput, setCustomInput] = useState("");
 
   const isBreak = mode === "break";
 
@@ -109,21 +113,52 @@ const PomodoroTimer = () => {
         </button>
       </div>
 
-      {/* Presets */}
-      <div className="flex gap-2">
-        {presets.map((p) => (
-          <button
-            key={p.label}
-            onClick={() => selectPreset(p)}
-            className={`rounded-full px-4 py-2 text-sm font-mono-display transition-all ${
-              preset.label === p.label
-                ? "bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--timer-ring)/0.2)]"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+      {/* Presets + Custom */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex gap-2">
+          {presets.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => { selectPreset(p); setCustomInput(""); }}
+              className={`rounded-full px-4 py-2 text-sm font-mono-display transition-all ${
+                preset.label === p.label && !customInput
+                  ? "bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--timer-ring)/0.2)]"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={240}
+            placeholder="Custom min"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const val = parseInt(customInput);
+                if (val > 0 && val <= 240) setCustomTime(val);
+              }
+            }}
+            className="w-28 rounded-full bg-secondary px-4 py-2 text-center text-sm font-mono-display text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
+          />
+          {customInput && parseInt(customInput) > 0 && (
+            <button
+              onClick={() => {
+                const val = parseInt(customInput);
+                if (val > 0 && val <= 240) setCustomTime(val);
+              }}
+              className="rounded-full bg-primary px-3 py-2 text-xs font-mono-display text-primary-foreground transition-all hover:shadow-[0_0_20px_hsl(var(--timer-ring)/0.2)]"
+            >
+              {parseInt(customInput)} / {Math.max(1, Math.round(parseInt(customInput) / 5))}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
