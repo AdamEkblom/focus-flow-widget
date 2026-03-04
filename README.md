@@ -1,73 +1,58 @@
-# Welcome to your Lovable project
+# Focus Flow
 
-## Project info
+A minimal Pomodoro focus timer that lives in the macOS menu bar.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Click the tray icon to open a compact widget with circular progress, preset durations, and session tracking. When a session ends, a native macOS notification fires. The widget dismisses itself when you click outside, staying out of your way until the next break.
 
-## How can I edit this code?
+## Origin
 
-There are several ways of editing your application.
+This project started as a browser-based React SPA generated with [Lovable](https://lovable.dev). Lovable scaffolded the initial UI — routing, shadcn-ui components, Tailwind styling, and a Vite build — which gave the project a working Pomodoro timer in the browser within minutes.
 
-**Use Lovable**
+To turn it into a proper desktop tool, the project was wrapped in [Tauri](https://tauri.app) — a Rust-based framework that bundles a web frontend into a lightweight native app. The Lovable-generated React UI was kept almost entirely intact; what changed was everything around it: tray icon with live countdown, borderless always-on-top window that hides on focus loss, full-screen Spaces support via `NSWindowCollectionBehavior` flags, native macOS notifications, and single-instance enforcement.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, TypeScript, Tailwind CSS, shadcn-ui, Framer Motion |
+| Build | Vite (SWC), Tauri CLI |
+| Backend | Rust, Tauri 2 |
+| Plugins | `tauri-plugin-notification`, `tauri-plugin-single-instance` |
+| macOS APIs | `objc2-app-kit` (NSWindowCollectionBehavior) |
+| Testing | Vitest + React Testing Library (frontend), `cargo test` (backend) |
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Prerequisites: [Node.js](https://nodejs.org/) and [Rust](https://rustup.rs/).
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install frontend dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Run the full Tauri app with hot-reload
+npm run tauri:dev
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Run frontend tests
+npm run test
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Run Rust backend tests
+cd src-tauri && cargo test
+
+# Build a production .app bundle
+npm run tauri:build
 ```
 
-**Edit a file directly in GitHub**
+## Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```
+focus-flow-widget/
+├── src/                      # React frontend
+│   ├── components/           # PomodoroTimer, CircularProgress, UI primitives
+│   ├── hooks/usePomodoro.ts  # All timer state, mode switching, tray updates
+│   └── test/                 # Vitest tests
+├── src-tauri/                # Rust backend
+│   ├── src/lib.rs            # Tray icon, window management, macOS integration
+│   ├── tauri.conf.json       # Window config, bundle settings
+│   └── Cargo.toml            # Rust dependencies
+└── index.html                # Vite entry point
+```
