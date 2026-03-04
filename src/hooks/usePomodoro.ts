@@ -1,4 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
+import { invoke } from "@tauri-apps/api/core";
 
 export type TimerMode = "work" | "break";
 
@@ -14,6 +20,14 @@ export const PRESETS: PomodoroPreset[] = [
   { label: "75 / 15", work: 75, break: 15 },
 ];
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+export { formatTime };
+
 export function usePomodoro() {
   const [preset, setPreset] = useState<PomodoroPreset>(PRESETS[0]);
   const [mode, setMode] = useState<TimerMode>("work");
@@ -25,23 +39,30 @@ export function usePomodoro() {
   const totalSeconds = mode === "work" ? preset.work * 60 : preset.break * 60;
   const progress = 1 - secondsLeft / totalSeconds;
 
-  const sendNotification = useCallback((title: string, body: string) => {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/favicon.ico" });
+  // Sync timer display to menu bar tray title
+  useEffect(() => {
+    invoke("update_tray_title", { title: `🍅 ${formatTime(secondsLeft)}` }).catch(() => {});
+  }, [secondsLeft]);
+
+  const notify = useCallback(async (title: string, body: string) => {
+    let granted = await isPermissionGranted().catch(() => false);
+    if (!granted) {
+      const perm = await requestPermission().catch(() => "denied");
+      granted = perm === "granted";
+    }
+    if (granted) {
+      sendNotification({ title, body });
     }
   }, []);
 
-  const requestNotificationPermission = useCallback(async () => {
-    if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission();
-    }
-  }, []);
-
-  const switchMode = useCallback((newMode: TimerMode) => {
-    setMode(newMode);
-    const secs = newMode === "work" ? preset.work * 60 : preset.break * 60;
-    setSecondsLeft(secs);
-  }, [preset]);
+  const switchMode = useCallback(
+    (newMode: TimerMode) => {
+      setMode(newMode);
+      const secs = newMode === "work" ? preset.work * 60 : preset.break * 60;
+      setSecondsLeft(secs);
+    },
+    [preset]
+  );
 
   useEffect(() => {
     if (!isRunning) {
@@ -52,14 +73,13 @@ export function usePomodoro() {
     intervalRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // Timer complete
           if (mode === "work") {
-            sendNotification("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
+            notify("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
             setCompletedSessions((s) => s + 1);
             setMode("break");
             return preset.break * 60;
           } else {
-            sendNotification("Back to work! 🔥", `Break's over. ${preset.work} minutes of focus ahead.`);
+            notify("Back to work! 🔥", `Break's over. ${preset.work} minutes of focus ahead.`);
             setMode("work");
             return preset.work * 60;
           }
@@ -71,7 +91,7 @@ export function usePomodoro() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning, mode, preset, sendNotification]);
+  }, [isRunning, mode, preset, notify]);
 
   const selectPreset = useCallback((p: PomodoroPreset) => {
     setPreset(p);
@@ -94,9 +114,8 @@ export function usePomodoro() {
   }, []);
 
   const toggle = useCallback(() => {
-    if (!isRunning) requestNotificationPermission();
     setIsRunning((r) => !r);
-  }, [isRunning, requestNotificationPermission]);
+  }, []);
 
   const reset = useCallback(() => {
     setIsRunning(false);

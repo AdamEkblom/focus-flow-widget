@@ -1,14 +1,8 @@
 import { useState } from "react";
-import { usePomodoro } from "@/hooks/usePomodoro";
+import { usePomodoro, formatTime } from "@/hooks/usePomodoro";
 import CircularProgress from "@/components/CircularProgress";
 import { Play, Pause, RotateCcw, SkipForward } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
 
 const PomodoroTimer = () => {
   const {
@@ -31,7 +25,10 @@ const PomodoroTimer = () => {
   const isBreak = mode === "break";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+    <div
+      data-tauri-drag-region
+      className="flex min-h-screen flex-col items-center justify-center bg-background px-4"
+    >
       {/* Session counter */}
       <motion.div
         className="mb-8 flex items-center gap-2"
@@ -119,7 +116,10 @@ const PomodoroTimer = () => {
           {presets.map((p) => (
             <button
               key={p.label}
-              onClick={() => { selectPreset(p); setCustomInput(""); }}
+              onClick={() => {
+                selectPreset(p);
+                setCustomInput("");
+              }}
               className={`rounded-full px-4 py-2 text-sm font-mono-display transition-all ${
                 preset.label === p.label && !customInput
                   ? "bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--timer-ring)/0.2)]"
@@ -155,7 +155,8 @@ const PomodoroTimer = () => {
               }}
               className="rounded-full bg-primary px-3 py-2 text-xs font-mono-display text-primary-foreground transition-all hover:shadow-[0_0_20px_hsl(var(--timer-ring)/0.2)]"
             >
-              {parseInt(customInput)} / {Math.max(1, Math.round(parseInt(customInput) / 5))}
+              {parseInt(customInput)} /{" "}
+              {Math.max(1, Math.round(parseInt(customInput) / 5))}
             </button>
           )}
         </div>
