@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Platform:** macOS native Tauri app
 - **Device:** MacBook Air
 - **Language:** TypeScript (frontend) + Rust (backend)
-- **UI Framework:** React 18 + shadcn-ui (Radix UI) + Tailwind CSS
+- **UI Framework:** React 18 + shadcn-ui (Radix UI) + Tailwind CSS + Framer Motion
 - **Build Tooling:** Vite with SWC (frontend), Cargo (Rust backend)
 - **Purpose:** Pomodoro timer app that lives in the macOS menu bar as a tray icon widget
 
@@ -20,7 +20,7 @@ npm run dev          # Start Vite dev server on :8080
 npm run build        # Production build (frontend only)
 npm run build:dev    # Development build
 npm run lint         # ESLint
-npm run test         # Run frontend tests once (vitest)
+npm run test         # Run frontend tests once (Vitest + React Testing Library)
 npm run test:watch   # Watch mode tests
 npm run tauri:dev    # Start full Tauri app (Rust + frontend, hot-reload)
 npm run tauri:build  # Build native macOS .app bundle
@@ -72,5 +72,4 @@ objc2-app-kit = { version = "0.3", features = ["NSWindow"] }  # macOS only
 - TypeScript is configured with loose settings (`noImplicitAny: false`, `strictNullChecks: false`)
 - Fonts: Inter for body text, JetBrains Mono for timer display (`.font-mono-display`)
 - Dark theme by default (class-based dark mode in Tailwind)
-- Animations use Framer Motion
 - `@typescript-eslint/no-unused-vars` is disabled in ESLint config
