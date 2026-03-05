@@ -35,6 +35,9 @@ export function usePomodoro() {
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const targetEndRef = useRef<number>(0);
+  const secondsLeftRef = useRef(secondsLeft);
+  secondsLeftRef.current = secondsLeft;
 
   const totalSeconds = mode === "work" ? preset.work * 60 : preset.break * 60;
   const progress = 1 - secondsLeft / totalSeconds;
@@ -70,23 +73,29 @@ export function usePomodoro() {
       return;
     }
 
+    targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+
     intervalRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          if (mode === "work") {
-            notify("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
-            setCompletedSessions((s) => s + 1);
-            setMode("break");
-            return preset.break * 60;
-          } else {
-            notify("Back to work! 🔥", `Break's over. ${preset.work} minutes of focus ahead.`);
-            setMode("work");
-            return preset.work * 60;
-          }
+      const remaining = Math.ceil((targetEndRef.current - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (mode === "work") {
+          notify("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
+          setCompletedSessions((s) => s + 1);
+          const newDuration = preset.break * 60;
+          targetEndRef.current = Date.now() + newDuration * 1000;
+          setMode("break");
+          setSecondsLeft(newDuration);
+        } else {
+          notify("Back to work! 🔥", `Break's over. ${preset.work} minutes of focus ahead.`);
+          const newDuration = preset.work * 60;
+          targetEndRef.current = Date.now() + newDuration * 1000;
+          setMode("work");
+          setSecondsLeft(newDuration);
         }
-        return prev - 1;
-      });
-    }, 1000);
+      } else {
+        setSecondsLeft(remaining);
+      }
+    }, 250);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

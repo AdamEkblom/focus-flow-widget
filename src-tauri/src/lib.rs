@@ -45,6 +45,22 @@ fn configure_macos_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
             ns_win.setCollectionBehavior(behavior);
         }
     }
+
+    // Force dark appearance so vibrancy renders dark regardless of system theme.
+    if let Ok(ptr) = window.ns_window() {
+        unsafe {
+            use objc2_app_kit::{
+                NSAppearance, NSAppearanceCustomization, NSAppearanceNameVibrantDark,
+            };
+            let ns_win = &*(ptr as *const NSWindow);
+            if let Some(dark) = NSAppearance::appearanceNamed(NSAppearanceNameVibrantDark) {
+                ns_win.setAppearance(Some(&dark));
+            }
+        }
+    }
+
+    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+    apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None).ok();
 }
 
 /// Position and show a window, ensuring it appears in full-screen Spaces on macOS.
@@ -97,7 +113,7 @@ pub fn run() {
                             if window.is_focused().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
-                                let win_width = 360_f64;
+                                let win_width = 300_f64;
                                 let x = (position.x - win_width / 2.0).max(0.0) as i32;
                                 let y = (position.y + 8.0) as i32;
                                 show_window(&window, x, y);

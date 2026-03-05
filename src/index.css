@@ -1,55 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 30 10% 8%;
-    --foreground: 40 20% 90%;
+    --background: 215 28% 18%;
+    --foreground: 210 15% 85%;
 
-    --card: 30 8% 12%;
-    --card-foreground: 40 20% 90%;
+    --card: 213 28% 22%;
+    --card-foreground: 210 15% 85%;
 
-    --popover: 30 8% 12%;
-    --popover-foreground: 40 20% 90%;
+    --popover: 213 28% 22%;
+    --popover-foreground: 210 15% 85%;
 
-    --primary: 38 90% 55%;
-    --primary-foreground: 30 10% 8%;
+    --primary: 30 90% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 8% 18%;
-    --secondary-foreground: 40 15% 75%;
+    --secondary: 213 22% 28%;
+    --secondary-foreground: 210 15% 75%;
 
-    --muted: 30 6% 16%;
-    --muted-foreground: 30 10% 50%;
+    --muted: 213 20% 24%;
+    --muted-foreground: 210 15% 50%;
 
-    --accent: 38 90% 55%;
-    --accent-foreground: 30 10% 8%;
+    --accent: 30 90% 55%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 40 20% 90%;
+    --destructive-foreground: 210 15% 85%;
 
-    --border: 30 8% 20%;
-    --input: 30 8% 20%;
-    --ring: 38 90% 55%;
+    --border: 212 20% 30%;
+    --input: 213 22% 26%;
+    --ring: 30 90% 55%;
 
     --radius: 1rem;
 
-    --sidebar-background: 30 8% 10%;
-    --sidebar-foreground: 40 20% 90%;
-    --sidebar-primary: 38 90% 55%;
-    --sidebar-primary-foreground: 30 10% 8%;
-    --sidebar-accent: 30 8% 16%;
-    --sidebar-accent-foreground: 40 20% 90%;
-    --sidebar-border: 30 8% 20%;
-    --sidebar-ring: 38 90% 55%;
+    --sidebar-background: 215 28% 16%;
+    --sidebar-foreground: 210 15% 85%;
+    --sidebar-primary: 30 90% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 20% 24%;
+    --sidebar-accent-foreground: 210 15% 85%;
+    --sidebar-border: 212 20% 30%;
+    --sidebar-ring: 30 90% 55%;
 
     /* Custom tokens */
-    --timer-ring: 38 90% 55%;
-    --timer-ring-rest: 180 60% 45%;
-    --timer-track: 30 6% 16%;
-    --glow-primary: 0 0% 0% / 0;
+    --timer-ring: 30 90% 55%;
+    --timer-ring-rest: 200 80% 60%;
+    --timer-track: 210 15% 85%;
+    --glow-primary: 0 0% 0%;
   }
 
   .dark {
@@ -62,9 +60,16 @@
     @apply border-border;
   }
 
+  html {
+    background: transparent;
+    padding: 6px;
+    overflow: hidden;
+  }
+
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    @apply text-foreground;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
     -webkit-user-select: none;
     user-select: none;
     overflow: hidden;
@@ -73,6 +78,6 @@
 
 @layer utilities {
   .font-mono-display {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, monospace;
   }
 }

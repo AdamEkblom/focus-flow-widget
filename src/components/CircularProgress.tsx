@@ -7,7 +7,7 @@ interface CircularProgressProps {
   isBreak?: boolean;
 }
 
-const CircularProgress = ({ progress, size = 280, strokeWidth = 6, isBreak = false }: CircularProgressProps) => {
+const CircularProgress = ({ progress, size = 140, strokeWidth = 4, isBreak = false }: CircularProgressProps) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - progress);

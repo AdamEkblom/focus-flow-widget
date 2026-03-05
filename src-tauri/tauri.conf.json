@@ -9,20 +9,21 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "withGlobalTauri": false,
     "windows": [
       {
         "label": "main",
         "title": "Focus Flow",
-        "width": 360,
-        "height": 660,
+        "width": 300,
+        "height": 380,
         "resizable": false,
         "decorations": false,
         "visible": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": true,
-        "transparent": false,
+        "transparent": true,
         "center": false
       }
     ],

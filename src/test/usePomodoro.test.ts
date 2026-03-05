@@ -122,6 +122,24 @@ describe("usePomodoro — button & timer behaviour", () => {
     expect(result.current.secondsLeft).toBe(frozenTime); // unchanged
   });
 
+  // ── 6. Timer resilient to interval throttling (hidden window) ──────────────
+  it("timer uses wall-clock time, resilient to interval throttling", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.toggle(); });
+
+    const startTime = Date.now();
+
+    // Simulate throttling: wall-clock jumps 10s but only one tick fires
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(startTime + 10_000);
+
+    act(() => { vi.advanceTimersByTime(250); });
+
+    expect(result.current.secondsLeft).toBe(1500 - 10);
+
+    nowSpy.mockRestore();
+  });
+
   // ── Bonus: session counter increments when work session completes ───────────
   it("increments completedSessions when a work session finishes", () => {
     const { result } = renderHook(() => usePomodoro());

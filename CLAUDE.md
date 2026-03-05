@@ -61,11 +61,32 @@ Entry point: `src-tauri/src/lib.rs`
 
 **Cargo deps of note:**
 ```toml
-tauri = { version = "2", features = ["tray-icon", "test"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "test"] }
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
-objc2-app-kit = { version = "0.3", features = ["NSWindow"] }  # macOS only
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSAppearance"] }  # macOS only
+window-vibrancy = "0.5"  # macOS only
 ```
+
+## Design Configuration
+
+**Window appearance:** Dark translucent vibrancy matching native macOS widgets.
+- `macOSPrivateApi: true` in `tauri.conf.json` (required for transparency)
+- `NSAppearanceNameVibrantDark` forced on the window so vibrancy renders dark regardless of system theme
+- `NSVisualEffectMaterial::HudWindow` vibrancy applied via `window-vibrancy` crate
+- Window is `transparent: true` with `decorations: false` — no native title bar
+
+**Rounded corners:** Achieved via CSS inset approach (not native `setCornerRadius`):
+- `html` has `padding: 6px` + `background: transparent` to create a transparent gap around content
+- Content wrapped in `<div className="h-screen rounded-2xl overflow-hidden">` in `Index.tsx`
+- This hides the sharp vibrancy rectangle corners behind the transparent padding
+
+**Color scheme:** Dark-first, defined as HSL CSS variables in `src/index.css`:
+- Background: dark (`215 28% 18%`) — shows through vibrancy as dark translucent
+- Foreground/text: light (`210 15% 85%`)
+- Timer ring (work): orange (`30 90% 55%`), timer ring (break): blue (`200 80% 60%`)
+- Timer track (circle outline): light/white (`210 15% 85%`) — visible against dark vibrancy
+- Accent/primary: orange (`30 90% 55%`)
 
 ## Key Conventions
 
