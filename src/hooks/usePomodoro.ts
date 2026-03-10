@@ -42,10 +42,14 @@ export function usePomodoro() {
   const totalSeconds = mode === "work" ? preset.work * 60 : preset.break * 60;
   const progress = 1 - secondsLeft / totalSeconds;
 
-  // Sync timer display to menu bar tray title
+  // Sync timer display to menu bar tray title only when NOT running.
+  // When running, the native Rust background thread handles tray updates
+  // independently of the WebView (which macOS may suspend).
   useEffect(() => {
-    invoke("update_tray_title", { title: `🍅 ${formatTime(secondsLeft)}` }).catch(() => {});
-  }, [secondsLeft]);
+    if (!isRunning) {
+      invoke("update_tray_title", { title: `🍅 ${formatTime(secondsLeft)}` }).catch(() => {});
+    }
+  }, [secondsLeft, isRunning]);
 
   const notify = useCallback(async (title: string, body: string) => {
     let granted = await isPermissionGranted().catch(() => false);
@@ -70,10 +74,16 @@ export function usePomodoro() {
   useEffect(() => {
     if (!isRunning) {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      invoke("stop_tray_countdown").catch(() => {});
       return;
     }
 
     targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+
+    invoke("start_tray_countdown", {
+      targetEndMs: targetEndRef.current,
+      prefix: mode === "work" ? "🍅" : "☕",
+    }).catch(() => {});
 
     intervalRef.current = setInterval(() => {
       const remaining = Math.ceil((targetEndRef.current - Date.now()) / 1000);
@@ -83,12 +93,20 @@ export function usePomodoro() {
           setCompletedSessions((s) => s + 1);
           const newDuration = preset.break * 60;
           targetEndRef.current = Date.now() + newDuration * 1000;
+          invoke("start_tray_countdown", {
+            targetEndMs: targetEndRef.current,
+            prefix: "☕",
+          }).catch(() => {});
           setMode("break");
           setSecondsLeft(newDuration);
         } else {
           notify("Back to work! 🔥", `Break's over. ${preset.work} minutes of focus ahead.`);
           const newDuration = preset.work * 60;
           targetEndRef.current = Date.now() + newDuration * 1000;
+          invoke("start_tray_countdown", {
+            targetEndMs: targetEndRef.current,
+            prefix: "🍅",
+          }).catch(() => {});
           setMode("work");
           setSecondsLeft(newDuration);
         }

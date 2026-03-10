@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { usePomodoro, PRESETS } from "@/hooks/usePomodoro";
+import { invoke } from "@tauri-apps/api/core";
 
 // Mock Tauri APIs — tests run in jsdom, no native app is launched
 vi.mock("@tauri-apps/api/core", () => ({
@@ -150,5 +151,38 @@ describe("usePomodoro — button & timer behaviour", () => {
 
     expect(result.current.completedSessions).toBe(1);
     expect(result.current.mode).toBe("break");
+  });
+
+  // ── 7. Native tray countdown commands ──────────────────────────────────────
+  it("calls start_tray_countdown when timer starts", () => {
+    const { result } = renderHook(() => usePomodoro());
+    (invoke as ReturnType<typeof vi.fn>).mockClear();
+
+    act(() => { result.current.toggle(); });
+
+    expect(invoke).toHaveBeenCalledWith("start_tray_countdown", expect.objectContaining({
+      targetEndMs: expect.any(Number),
+      prefix: "🍅",
+    }));
+  });
+
+  it("calls stop_tray_countdown when timer pauses", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.toggle(); }); // start
+    (invoke as ReturnType<typeof vi.fn>).mockClear();
+    act(() => { result.current.toggle(); }); // pause
+
+    expect(invoke).toHaveBeenCalledWith("stop_tray_countdown");
+  });
+
+  it("calls stop_tray_countdown when timer resets", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.toggle(); }); // start
+    (invoke as ReturnType<typeof vi.fn>).mockClear();
+    act(() => { result.current.reset(); });
+
+    expect(invoke).toHaveBeenCalledWith("stop_tray_countdown");
   });
 });

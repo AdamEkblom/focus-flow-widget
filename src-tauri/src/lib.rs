@@ -1,7 +1,29 @@
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+
+/// Shared state for the native background countdown thread.
+/// When `target_end_ms` is `Some`, the background thread updates the tray title
+/// every second independently of the WebView (which macOS may suspend).
+struct TimerState {
+    /// Unix timestamp in milliseconds when the timer should reach zero.
+    target_end_ms: Option<i64>,
+    /// Display prefix, e.g. "🍅" for work or "☕" for break.
+    prefix: String,
+}
+
+impl Default for TimerState {
+    fn default() -> Self {
+        Self {
+            target_end_ms: None,
+            prefix: "🍅".to_string(),
+        }
+    }
+}
 
 #[tauri::command]
 fn update_tray_title(app: tauri::AppHandle, title: String) {
@@ -17,6 +39,25 @@ fn hide_window(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
     }
+}
+
+#[tauri::command]
+fn start_tray_countdown(
+    state: tauri::State<'_, Arc<Mutex<TimerState>>>,
+    target_end_ms: i64,
+    prefix: Option<String>,
+) {
+    let mut s = state.lock().unwrap();
+    s.target_end_ms = Some(target_end_ms);
+    if let Some(p) = prefix {
+        s.prefix = p;
+    }
+}
+
+#[tauri::command]
+fn stop_tray_countdown(state: tauri::State<'_, Arc<Mutex<TimerState>>>) {
+    let mut s = state.lock().unwrap();
+    s.target_end_ms = None;
 }
 
 fn on_second_instance<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -74,11 +115,19 @@ fn show_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, x: i32, y: i
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             on_second_instance(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        .manage(Arc::new(Mutex::new(TimerState::default())))
         .setup(|app| {
+            // Enable auto-start on first launch (silently opt-in).
+            let autostart = app.autolaunch();
+            if !autostart.is_enabled().unwrap_or(false) {
+                let _ = autostart.enable();
+            }
+
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -123,16 +172,51 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Spawn a native background thread that updates the tray title every
+            // second. Unlike the WebView's setInterval, this thread is NOT
+            // suspended by macOS when the window is hidden or the system sleeps.
+            let timer_state = app.state::<Arc<Mutex<TimerState>>>().inner().clone();
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+
+                    let state = timer_state.lock().unwrap();
+                    if let Some(target_ms) = state.target_end_ms {
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as i64;
+                        let remaining_secs =
+                            ((target_ms - now_ms) as f64 / 1000.0).ceil().max(0.0) as i64;
+                        let mins = remaining_secs / 60;
+                        let secs = remaining_secs % 60;
+                        let title = format!("{} {:02}:{:02}", state.prefix, mins, secs);
+                        drop(state); // release lock before tray API call
+
+                        if let Some(tray) = app_handle.tray_by_id("main") {
+                            let _ = tray.set_tooltip(Some(&title));
+                            #[cfg(target_os = "macos")]
+                            let _ = tray.set_title(Some(&title));
+                        }
+                    }
+                    // When target_end_ms is None, the lock is dropped automatically
+                    // and the thread just sleeps — no CPU cost.
+                }
+            });
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![update_tray_title, hide_window])
+        .invoke_handler(tauri::generate_handler![update_tray_title, hide_window, start_tray_countdown, stop_tray_countdown])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{on_second_instance, show_window};
+    use super::{on_second_instance, show_window, TimerState};
+    use std::sync::{Arc, Mutex};
+    use tauri_plugin_autostart::ManagerExt;
 
     #[test]
     fn second_instance_does_not_panic_when_no_window() {
@@ -187,5 +271,57 @@ mod tests {
 
         assert!(window.is_visible().unwrap_or(false), "window should start visible");
         assert!(window.hide().is_ok(), "hide() must not return an error on focus loss");
+    }
+
+    #[test]
+    fn autostart_plugin_initializes_without_panic() {
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("failed to build mock app with autostart plugin");
+        // Verify the manager is accessible without panicking
+        let _manager = app.autolaunch();
+    }
+
+    #[test]
+    fn timer_state_start_and_stop() {
+        let state = Arc::new(Mutex::new(TimerState::default()));
+
+        // Initially no active countdown
+        assert!(state.lock().unwrap().target_end_ms.is_none());
+
+        // Start countdown
+        {
+            let mut s = state.lock().unwrap();
+            s.target_end_ms = Some(1_700_000_000_000);
+            s.prefix = "🍅".to_string();
+        }
+        assert_eq!(state.lock().unwrap().target_end_ms, Some(1_700_000_000_000));
+        assert_eq!(state.lock().unwrap().prefix, "🍅");
+
+        // Stop countdown
+        {
+            let mut s = state.lock().unwrap();
+            s.target_end_ms = None;
+        }
+        assert!(state.lock().unwrap().target_end_ms.is_none());
+    }
+
+    #[test]
+    fn autostart_is_disabled_by_default_in_mock() {
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("failed to build mock app");
+        let autostart = app.autolaunch();
+        // In mock context (no real bundle ID / plist), is_enabled returns false
+        let enabled = autostart.is_enabled().unwrap_or(false);
+        assert!(!enabled, "autostart should not be enabled in mock context");
     }
 }
