@@ -57,13 +57,18 @@ Entry point: `src-tauri/src/lib.rs`
 - **Hide on focus loss:** `WindowEvent::Focused(false)` handler hides the window when the user clicks outside.
 - **Single instance:** `tauri-plugin-single-instance` ensures only one app instance runs; a second launch focuses the existing window.
 
-**Plugins used:** `tauri-plugin-notification`, `tauri-plugin-single-instance`
+**Plugins used:** `tauri-plugin-notification`, `tauri-plugin-single-instance`, `tauri-plugin-autostart`
+
+**Background tray countdown:** A native Rust thread (`std::thread::spawn`) updates the tray title every second using `TimerState` (shared via `Arc<Mutex<TimerState>>`). Frontend starts/stops it via `start_tray_countdown` / `stop_tray_countdown` Tauri commands. This runs independently of the WebView so macOS cannot suspend it.
+
+**Auto-start:** `tauri-plugin-autostart` registers a LaunchAgent on first run via `app.autolaunch()` (requires `use tauri_plugin_autostart::ManagerExt` in scope).
 
 **Cargo deps of note:**
 ```toml
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "test"] }
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSAppearance"] }  # macOS only
 window-vibrancy = "0.5"  # macOS only
 ```
@@ -73,13 +78,13 @@ window-vibrancy = "0.5"  # macOS only
 **Window appearance:** Dark translucent vibrancy matching native macOS widgets.
 - `macOSPrivateApi: true` in `tauri.conf.json` (required for transparency)
 - `NSAppearanceNameVibrantDark` forced on the window so vibrancy renders dark regardless of system theme
-- `NSVisualEffectMaterial::HudWindow` vibrancy applied via `window-vibrancy` crate
+- `NSVisualEffectMaterial::HudWindow` vibrancy applied via `window-vibrancy` crate with `Some(10.0)` corner radius
 - Window is `transparent: true` with `decorations: false` — no native title bar
 
-**Rounded corners:** Achieved via CSS inset approach (not native `setCornerRadius`):
-- `html` has `padding: 6px` + `background: transparent` to create a transparent gap around content
-- Content wrapped in `<div className="h-screen rounded-2xl overflow-hidden">` in `Index.tsx`
-- This hides the sharp vibrancy rectangle corners behind the transparent padding
+**Rounded corners:** Native vibrancy radius + CSS radius must match (both **10px**):
+- `apply_vibrancy(..., None, Some(10.0))` in `configure_macos_window()` sets the native blur corner radius
+- Content wrapped in `<div className="h-screen rounded-[10px] overflow-hidden">` in `Index.tsx`
+- `html` has no padding — content sits flush against the window edge; native shadow provides depth
 
 **Color scheme:** Dark-first, defined as HSL CSS variables in `src/index.css`:
 - Background: dark (`215 28% 18%`) — shows through vibrancy as dark translucent

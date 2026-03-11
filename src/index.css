@@ -56,13 +56,12 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  *, *::before, *::after {
+    border-color: hsl(var(--border));
   }
 
   html {
     background: transparent;
-    padding: 6px;
     overflow: hidden;
   }
 

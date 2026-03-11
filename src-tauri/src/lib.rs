@@ -101,7 +101,7 @@ fn configure_macos_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
     }
 
     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
-    apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None).ok();
+    apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, Some(10.0)).ok();
 }
 
 /// Position and show a window, ensuring it appears in full-screen Spaces on macOS.
@@ -127,7 +127,6 @@ pub fn run() {
             if !autostart.is_enabled().unwrap_or(false) {
                 let _ = autostart.enable();
             }
-
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -256,6 +255,33 @@ mod tests {
     }
 
     #[test]
+    fn autostart_plugin_initializes_without_panic() {
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("failed to build mock app with autostart plugin");
+        let _manager = app.handle().autolaunch();
+    }
+
+    #[test]
+    fn autostart_is_disabled_by_default_in_mock() {
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("failed to build mock app");
+        let autostart = app.handle().autolaunch();
+        // In mock context (no real bundle ID / plist), is_enabled returns false
+        let enabled = autostart.is_enabled().unwrap_or(false);
+        assert!(!enabled, "autostart should not be enabled in mock context");
+    }
+
+    #[test]
     fn window_hides_on_focus_lost() {
         // Verify the hide() call (triggered by Focused(false) in the event handler)
         // completes without error. The mock runtime has no real window system so
@@ -271,19 +297,6 @@ mod tests {
 
         assert!(window.is_visible().unwrap_or(false), "window should start visible");
         assert!(window.hide().is_ok(), "hide() must not return an error on focus loss");
-    }
-
-    #[test]
-    fn autostart_plugin_initializes_without_panic() {
-        let app = tauri::test::mock_builder()
-            .plugin(tauri_plugin_autostart::init(
-                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-                None,
-            ))
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .expect("failed to build mock app with autostart plugin");
-        // Verify the manager is accessible without panicking
-        let _manager = app.autolaunch();
     }
 
     #[test]
@@ -310,18 +323,4 @@ mod tests {
         assert!(state.lock().unwrap().target_end_ms.is_none());
     }
 
-    #[test]
-    fn autostart_is_disabled_by_default_in_mock() {
-        let app = tauri::test::mock_builder()
-            .plugin(tauri_plugin_autostart::init(
-                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-                None,
-            ))
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .expect("failed to build mock app");
-        let autostart = app.autolaunch();
-        // In mock context (no real bundle ID / plist), is_enabled returns false
-        let enabled = autostart.is_enabled().unwrap_or(false);
-        assert!(!enabled, "autostart should not be enabled in mock context");
-    }
 }
