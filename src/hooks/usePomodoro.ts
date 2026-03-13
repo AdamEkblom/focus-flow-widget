@@ -38,6 +38,8 @@ export function usePomodoro() {
   const targetEndRef = useRef<number>(0);
   const secondsLeftRef = useRef(secondsLeft);
   secondsLeftRef.current = secondsLeft;
+  // Set to true by transition code so the effect re-run preserves targetEndRef
+  const isTransitionRef = useRef(false);
 
   const totalSeconds = mode === "work" ? preset.work * 60 : preset.break * 60;
   const progress = 1 - secondsLeft / totalSeconds;
@@ -78,7 +80,10 @@ export function usePomodoro() {
       return;
     }
 
-    targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+    if (!isTransitionRef.current) {
+      targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+    }
+    isTransitionRef.current = false;
 
     invoke("start_tray_countdown", {
       targetEndMs: targetEndRef.current,
@@ -97,6 +102,7 @@ export function usePomodoro() {
             targetEndMs: targetEndRef.current,
             prefix: "☕",
           }).catch(() => {});
+          isTransitionRef.current = true;
           setMode("break");
           setSecondsLeft(newDuration);
         } else {
@@ -107,6 +113,7 @@ export function usePomodoro() {
             targetEndMs: targetEndRef.current,
             prefix: "🍅",
           }).catch(() => {});
+          isTransitionRef.current = true;
           setMode("work");
           setSecondsLeft(newDuration);
         }
