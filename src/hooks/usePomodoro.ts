@@ -90,9 +90,15 @@ export function usePomodoro() {
       prefix: mode === "work" ? "🍅" : "☕",
     }).catch(() => {});
 
-    intervalRef.current = setInterval(() => {
+    // Guard prevents the transition firing twice if the interval ticks before
+    // effect cleanup when the WebView wakes from macOS throttling.
+    let transitioned = false;
+
+    const tick = () => {
       const remaining = Math.ceil((targetEndRef.current - Date.now()) / 1000);
       if (remaining <= 0) {
+        if (transitioned) return;
+        transitioned = true;
         if (mode === "work") {
           notify("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
           setCompletedSessions((s) => s + 1);
@@ -120,10 +126,21 @@ export function usePomodoro() {
       } else {
         setSecondsLeft(remaining);
       }
-    }, 250);
+    };
+
+    intervalRef.current = setInterval(tick, 250);
+
+    // When macOS throttles the WebView (window hidden), the interval may not
+    // fire while the timer expires. Fire an immediate tick when the page
+    // becomes visible again so the transition happens without delay.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isRunning, mode, preset, notify]);
 
