@@ -38,6 +38,8 @@ export function usePomodoro() {
   const targetEndRef = useRef<number>(0);
   const secondsLeftRef = useRef(secondsLeft);
   secondsLeftRef.current = secondsLeft;
+  // Set to true by transition code so the effect re-run preserves targetEndRef
+  const isTransitionRef = useRef(false);
 
   const totalSeconds = mode === "work" ? preset.work * 60 : preset.break * 60;
   const progress = 1 - secondsLeft / totalSeconds;
@@ -78,16 +80,25 @@ export function usePomodoro() {
       return;
     }
 
-    targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+    if (!isTransitionRef.current) {
+      targetEndRef.current = Date.now() + secondsLeftRef.current * 1000;
+    }
+    isTransitionRef.current = false;
 
     invoke("start_tray_countdown", {
       targetEndMs: targetEndRef.current,
       prefix: mode === "work" ? "🍅" : "☕",
     }).catch(() => {});
 
-    intervalRef.current = setInterval(() => {
+    // Guard prevents the transition firing twice if the interval ticks before
+    // effect cleanup when the WebView wakes from macOS throttling.
+    let transitioned = false;
+
+    const tick = () => {
       const remaining = Math.ceil((targetEndRef.current - Date.now()) / 1000);
       if (remaining <= 0) {
+        if (transitioned) return;
+        transitioned = true;
         if (mode === "work") {
           notify("Break time! ☕", `Great work! Take a ${preset.break}-minute break.`);
           setCompletedSessions((s) => s + 1);
@@ -97,6 +108,7 @@ export function usePomodoro() {
             targetEndMs: targetEndRef.current,
             prefix: "☕",
           }).catch(() => {});
+          isTransitionRef.current = true;
           setMode("break");
           setSecondsLeft(newDuration);
         } else {
@@ -107,16 +119,28 @@ export function usePomodoro() {
             targetEndMs: targetEndRef.current,
             prefix: "🍅",
           }).catch(() => {});
+          isTransitionRef.current = true;
           setMode("work");
           setSecondsLeft(newDuration);
         }
       } else {
         setSecondsLeft(remaining);
       }
-    }, 250);
+    };
+
+    intervalRef.current = setInterval(tick, 250);
+
+    // When macOS throttles the WebView (window hidden), the interval may not
+    // fire while the timer expires. Fire an immediate tick when the page
+    // becomes visible again so the transition happens without delay.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isRunning, mode, preset, notify]);
 

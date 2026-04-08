@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { usePomodoro, PRESETS } from "@/hooks/usePomodoro";
 import { invoke } from "@tauri-apps/api/core";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 // Mock Tauri APIs — tests run in jsdom, no native app is launched
 vi.mock("@tauri-apps/api/core", () => ({
@@ -184,5 +185,100 @@ describe("usePomodoro — button & timer behaviour", () => {
     act(() => { result.current.reset(); });
 
     expect(invoke).toHaveBeenCalledWith("stop_tray_countdown");
+  });
+
+  // ── 8. Timer transition: countdown stops ────────────────────────────────────
+  it("timer keeps running after work session expires (isRunning stays true)", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 1 / 60 }); });
+    act(() => { result.current.toggle(); });
+    act(() => { vi.advanceTimersByTime(1100); });
+
+    expect(result.current.isRunning).toBe(true);
+  });
+
+  it("secondsLeft resets to break duration after work session expires", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 1 / 60 }); });
+    act(() => { result.current.toggle(); });
+    act(() => { vi.advanceTimersByTime(1100); });
+
+    expect(result.current.secondsLeft).toBe(1); // break: 1/60 min = 1 second
+    expect(result.current.mode).toBe("break");
+  });
+
+  it("break timer counts down after work session expires", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    // 1s work, 5s break
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 5 / 60 }); });
+    act(() => { result.current.toggle(); });
+    act(() => { vi.advanceTimersByTime(1100); }); // complete work session
+    act(() => { vi.advanceTimersByTime(2000); }); // 2s into the break
+
+    expect(result.current.mode).toBe("break");
+    expect(result.current.secondsLeft).toBeGreaterThanOrEqual(2);
+    expect(result.current.secondsLeft).toBeLessThanOrEqual(4);
+  });
+
+  it("timer keeps running after break session expires (break → work transition)", () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 1 / 60 }); });
+    act(() => { result.current.toggle(); });
+    act(() => { vi.advanceTimersByTime(1100); }); // complete work → break
+    act(() => { vi.advanceTimersByTime(1100); }); // complete break → work
+
+    expect(result.current.isRunning).toBe(true);
+    expect(result.current.mode).toBe("work");
+  });
+
+  // ── 9. Notifications ────────────────────────────────────────────────────────
+  it("sends notification when work session expires", async () => {
+    const { result } = renderHook(() => usePomodoro());
+    (sendNotification as ReturnType<typeof vi.fn>).mockClear();
+
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 1 / 60 }); });
+    act(() => { result.current.toggle(); });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1100);
+      // Flush the async notify() microtasks (isPermissionGranted → sendNotification)
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Break time! ☕" })
+    );
+  });
+
+  it("sends notification when break session expires", async () => {
+    const { result } = renderHook(() => usePomodoro());
+
+    act(() => { result.current.selectPreset({ label: "test", work: 1 / 60, break: 1 / 60 }); });
+    act(() => { result.current.toggle(); });
+
+    // Complete work → break
+    await act(async () => {
+      vi.advanceTimersByTime(1100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    (sendNotification as ReturnType<typeof vi.fn>).mockClear();
+
+    // Complete break → work
+    await act(async () => {
+      vi.advanceTimersByTime(1100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Back to work! 🔥" })
+    );
   });
 });
